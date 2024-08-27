@@ -126,6 +126,7 @@ def init_ollama_session():
     return session['ollama_instance']
 
 def get_response_from_model(user_content: str, sid: str):
+    
     embedding_function = get_embedding_function()
     db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
 
@@ -159,6 +160,7 @@ def get_response_from_model(user_content: str, sid: str):
 
     # Salvar a resposta completa após o término do streaming
     save_to_excel(user_content, response_text)
+    socketio.emit('response_complete', room=sid)
     return formatted_response
     
 
@@ -207,9 +209,11 @@ def handle_message(data):
     if not content:
         return
 
+    emit("response_chunk", {'data':'Só um momento, estou verificando...'}, room=sid)
+
     print(f"Recebido: {content} - Conexão: {sid}")
     response = get_response_from_model(content, sid)
-    emit('response_chunk', {'data': response}, room=sid)
+    #emit('response_chunk', {'data': response}, room=sid)
     
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
