@@ -1,0 +1,238 @@
+HTML_TEMPLATE = '''
+<div class="chat-container">
+    <div class="chat-header">
+        <h1>Ozul Chat</h1>
+    </div>
+    <div id="response" class="chat-messages"></div>
+    <form id="chatForm" class="chat-form">
+        <input type="text" id="content" placeholder="Digite sua mensagem" autocomplete="off">
+        <button type="submit"><i class="fas fa-paper-plane"></i></button>
+    </form>
+</div>
+
+<!-- Modal Popup -->
+<div id="sourceModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <p id="sourceContent"></p>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+        var form = document.getElementById('chatForm');
+        var responseDiv = document.getElementById('response');
+        var currentResponseMessage;
+        var currentSources;
+
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            var content = document.getElementById('content').value;
+
+            // Adicionar a mensagem do usuário ao chat
+            var userMessage = document.createElement('div');
+            userMessage.textContent = content;
+            userMessage.classList.add('user-message');
+            responseDiv.appendChild(userMessage);
+            responseDiv.scrollTop = responseDiv.scrollHeight;
+
+            // Enviar a mensagem ao servidor
+            socket.emit('send_message', {'content': content});
+            document.getElementById('content').value = '';
+            currentResponseMessage = null;  // Reset current response message
+        });
+
+        socket.on('response_chunk', (data) => {
+            if (!currentResponseMessage) {
+                currentResponseMessage = document.createElement('div');
+                currentResponseMessage.classList.add('response-message');
+            }
+            if (data.data.startsWith("Response:")) {
+                // Separar a resposta das fontes
+                const responseParts = data.data.split("Sources:");
+                currentResponseMessage.innerHTML += responseParts[0];
+
+                // Salvar as fontes para uso no popup
+                currentSources = responseParts[1].trim();
+
+                // Adicionar botão de fontes
+                var sourceButton = document.createElement('button');
+                sourceButton.textContent = "Ver Fontes";
+                sourceButton.classList.add('source-button');
+                sourceButton.onclick = function() {
+                    var modal = document.getElementById("sourceModal");
+                    var span = document.getElementsByClassName("close")[0];
+                    document.getElementById("sourceContent").textContent = currentSources;
+
+                    // Mostrar o modal
+                    modal.style.display = "block";
+
+                    // Fechar o modal ao clicar no X
+                    span.onclick = function() {
+                        modal.style.display = "none";
+                    }
+
+                    // Fechar o modal ao clicar fora dele
+                    window.onclick = function(event) {
+                        if (event.target == modal) {
+                            modal.style.display = "none";
+                        }
+                    }
+                };
+                currentResponseMessage.appendChild(sourceButton);
+            } else {
+                currentResponseMessage.innerHTML += data.data;
+            }
+
+            responseDiv.appendChild(currentResponseMessage);
+            responseDiv.scrollTop = responseDiv.scrollHeight;
+        });
+    });
+</script>
+<style>
+    body {
+        font-family: 'Roboto', sans-serif;
+        background-color: #f0f2f5;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+    }
+
+    .chat-container {
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        width: 450px;
+        max-width: 100%;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 80vh;  /* Adjust height to fit within the viewport */
+    }
+
+    .chat-header {
+        background-color: #006635;
+        color: #ffffff;
+        padding: 15px;
+        text-align: center;
+    }
+
+    .chat-messages {
+        flex-grow: 1;
+        padding: 15px;
+        overflow-y: auto;
+        border-bottom: 1px solid #ddd;
+        background-color: #f9f9f9;
+    }
+
+    .chat-form {
+        display: flex;
+        padding: 10px;
+        border-top: 1px solid #ddd;
+        background-color: #ffffff;
+    }
+
+    .chat-form input {
+        flex-grow: 1;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        outline: none;
+        font-size: 14px;
+    }
+
+    .chat-form button {
+        background-color: #006635;
+        color: #ffffff;
+        border: none;
+        padding: 10px 20px;
+        margin-left: 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        font-size: 14px;
+    }
+
+    .chat-form button:hover {
+        background-color: #004f26;
+    }
+
+    .user-message, .response-message {
+        margin-bottom: 10px;
+        padding: 10px;
+        border-radius: 4px;
+        max-width: 75%;
+        word-wrap: break-word;
+    }
+
+    .user-message {
+        background-color: #dcf8c6;
+        align-self: flex-end;
+        color: #333;
+    }
+
+    .response-message {
+        background-color: #ececec;
+        align-self: flex-start;
+        color: #333;
+    }
+
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        padding-top: 100px;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-content {
+        background-color: #ffffff;
+        margin: auto;
+        padding: 20px;
+        border: 1px solid #ccc;
+        width: 80%;
+        max-width: 500px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+    }
+
+    .close:hover,
+    .close:focus {
+        color: #000;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .source-button {
+        background-color: #006635;
+        color: #ffffff;
+        border: none;
+        padding: 10px;
+        margin-top: 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .source-button:hover {
+        background-color: #004f26;
+    }
+</style>
+'''
